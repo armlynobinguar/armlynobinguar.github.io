@@ -1,66 +1,56 @@
-// Interactive hero chat: plays an intro, then answers quick-reply questions.
+// "Ask me something": a small chat that answers a few common questions.
+// It starts when it scrolls into view, so it isn't animating while you read the top.
 (() => {
   const body = document.getElementById("chatBody");
   const chips = document.getElementById("chips");
-  const replay = document.querySelector(".replay");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const wait = (ms) => new Promise((r) => setTimeout(r, reduced ? 0 : ms));
-  let run = 0; // bumps on replay so an old run stops talking
+  let busy = false;
 
-  const INTRO = [
-    ["you", "hey! who are you?"],
-    ["me", "Hi, I'm Armielyn. Developer Relations for AI & Web3."],
-    ["me", "I help developers go from \"what is this?\" to \"I shipped it\"."],
-  ];
+  const GREETING = "Hi! Pick a question below and I'll answer.";
 
   const QUESTIONS = [
-    { q: "Where do you work?", a: [
-      "Right now: DevRel at <a href=\"https://www.risein.com\" target=\"_blank\" rel=\"noopener\">Rise In</a>.",
-      "Before that: Head of DevRel at TARS AI, and DevRel at Virtuals Protocol / PathDAO.",
+    { q: "What do you do?", a: [
+      "Developer relations at <a href=\"https://www.risein.com\">Rise In</a>.",
+      "In practice: guides, sample apps, workshops, and passing on what developers struggled with.",
     ] },
-    { q: "What have you done for builders?", a: [
-      "5,000+ builders onboarded across Southeast Asia.",
-      "100+ talks, workshops and demos, including Solidity Fundamentals workshops.",
+    { q: "Where did you work before?", a: [
+      "Head of DevRel at TARS AI, and DevRel at Virtuals Protocol / PathDAO.",
+      "Before that I was an ML engineer at Accenture and led ML work at Omdena.",
     ] },
     { q: "What are you building?", a: [
-      "Doqtri: planned vs shipped, proven on Stellar.",
-      "Your plan becomes a mindmap, each node links to the PR that shipped it, and every version is anchored on-chain. Try it at <a href=\"https://www.doqtri.xyz\" target=\"_blank\" rel=\"noopener\">doqtri.xyz</a>.",
-    ] },
-    { q: "Any research?", a: [
-      "Split-Brain RAG, accepted at NIAI 2026, with Jodi Moselle Alcantara.",
-      "It looks at hybrid RAG for scientific QA and introduces the Value Ratio metric.",
+      "Doqtri. It turns a plan into a mindmap and records on Stellar what actually shipped.",
+      "It's at <a href=\"https://www.doqtri.xyz\">doqtri.xyz</a> if you want to try it.",
     ] },
     { q: "Can you speak at our event?", a: [
-      "Yes! Talks, hands-on workshops, and hackathon mentoring or judging.",
-      "DM me on X <a href=\"https://twitter.com/aeriumcius\" target=\"_blank\" rel=\"noopener\">@aeriumcius</a> or on <a href=\"https://www.linkedin.com/in/armielyn-obinguar/\" target=\"_blank\" rel=\"noopener\">LinkedIn</a>.",
+      "Probably! Talks, workshops, or mentoring and judging at hackathons.",
+      "Message me on X: <a href=\"https://twitter.com/aeriumcius\">@aeriumcius</a>.",
     ] },
   ];
 
   function add(who, html) {
     const el = document.createElement("div");
     el.className = `msg ${who}`;
-    if (who === "me") el.innerHTML = html; else el.textContent = html; // only my fixed copy uses HTML links
+    if (who === "me") el.innerHTML = html; else el.textContent = html; // only my own fixed text uses links
     body.appendChild(el);
     body.scrollTop = body.scrollHeight;
   }
 
-  async function say(lines, id) {
+  async function reply(lines) {
     for (const line of lines) {
-      if (id !== run) return;
       const t = document.createElement("div");
       t.className = "typing";
       t.innerHTML = "<span></span><span></span><span></span>";
       body.appendChild(t);
       body.scrollTop = body.scrollHeight;
-      await wait(700 + Math.min(line.length * 12, 900));
+      await wait(600 + Math.min(line.length * 10, 700));
       t.remove();
-      if (id !== run) return;
       add("me", line);
-      await wait(350);
+      await wait(250);
     }
   }
 
-  function renderChips(asked, id) {
+  function renderChips(asked) {
     chips.innerHTML = "";
     QUESTIONS.forEach((item, i) => {
       if (asked.has(i)) return;
@@ -68,38 +58,42 @@
       b.type = "button";
       b.textContent = item.q;
       b.addEventListener("click", async () => {
-        if (id !== run) return;
+        if (busy) return;
+        busy = true;
         chips.querySelectorAll("button").forEach((x) => (x.disabled = true));
         asked.add(i);
         add("you", item.q);
-        await wait(300);
-        await say(item.a, id);
-        if (id === run) renderChips(asked, id);
+        await wait(250);
+        await reply(item.a);
+        busy = false;
+        renderChips(asked);
       });
       chips.appendChild(b);
     });
-    if (!chips.children.length && id === run) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = "Start over";
-      b.addEventListener("click", start);
-      chips.appendChild(b);
+    if (!chips.children.length) {
+      const done = document.createElement("span");
+      done.className = "small";
+      done.innerHTML = "That's all I've got here. For anything else, <a href=\"https://twitter.com/aeriumcius\">message me</a>.";
+      chips.appendChild(done);
     }
   }
 
   async function start() {
-    const id = ++run;
-    body.innerHTML = "";
-    chips.innerHTML = "";
-    for (const [who, text] of INTRO) {
-      if (id !== run) return;
-      if (who === "you") { await wait(500); add("you", text); await wait(300); }
-      else await say([text], id);
-    }
-    if (id === run) renderChips(new Set(), id);
+    await reply([GREETING]);
+    renderChips(new Set());
   }
 
-  replay.addEventListener("click", start);
   document.getElementById("year").textContent = new Date().getFullYear();
-  start();
+
+  if ("IntersectionObserver" in window) {
+    const seen = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        seen.disconnect();
+        start();
+      }
+    }, { threshold: 0.4 });
+    seen.observe(body);
+  } else {
+    start();
+  }
 })();
