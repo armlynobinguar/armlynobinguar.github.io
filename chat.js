@@ -73,7 +73,7 @@
     if (!chips.children.length) {
       const done = document.createElement("span");
       done.className = "small";
-      done.innerHTML = "That's all I've got here. For anything else, <a href=\"https://twitter.com/aeriumcius\">message me</a>.";
+      done.innerHTML = "That's all for now. For anything else, <a href=\"https://twitter.com/aeriumcius\">message me on X</a>.";
       chips.appendChild(done);
     }
   }
@@ -83,7 +83,6 @@
     renderChips(new Set());
   }
 
-  document.getElementById("year").textContent = new Date().getFullYear();
 
   if ("IntersectionObserver" in window) {
     const seen = new IntersectionObserver((entries) => {
